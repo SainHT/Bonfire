@@ -3,13 +3,19 @@ Main FastAPI application for Bonfire backend.
 Entry point for the community discovery and recommendation engine.
 """
 
+import sys
+from pathlib import Path
+from contextlib import asynccontextmanager
+
+# Support direct execution: python backend/main.py
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
-from services import recommender_service
 
-# Import routes
-from api.routes import router as api_router
+from backend.api.routes import router as api_router
+from backend.services import recommender_service
 
 
 @asynccontextmanager
@@ -29,12 +35,14 @@ async def lifespan(app: FastAPI):
         print("⚠️  Recommender engine not ready - will fall back to basic matching")
     
     print("📍 Available endpoints:")
-    print("  - POST /recommend - Get community recommendations")
-    print("  - GET /communities - List all communities")
-    print("  - GET /communities/{id} - Get specific community")
-    print("  - GET /niches - Available community types")
-    print("  - GET /cities - Available cities")
-    print("  - GET /health - Health check")
+    print("  - POST /api/recommend       - AI recommender (semantic search)")
+    print("  - GET  /api/communities     - List all communities")
+    print("  - GET  /api/communities/{id}- Get specific community")
+    print("  - GET  /api/niches          - Available community types")
+    print("  - GET  /api/cities          - Available cities")
+    print("  - GET  /api/health          - Health check")
+    print("  - GET  /docs                - Interactive API docs (Swagger UI)")
+    print("  - GET  /openapi.json        - OpenAPI schema")
     
     yield
     
@@ -76,8 +84,21 @@ async def root():
             "docs": "/docs",
             "openapi": "/openapi.json",
             "health": "/api/health",
-            "recommend": "POST /api/recommend"
-        }
+            "ai_recommender": "POST /api/recommend",
+            "ai_recommender_status": "GET /api/recommender/status",
+            "communities": "GET /api/communities",
+            "niches": "GET /api/niches",
+            "cities": "GET /api/cities",
+        },
+        "ai_recommender_example": {
+            "method": "POST",
+            "url": "/api/recommend",
+            "body": {
+                "city": "Delft",
+                "interests": "board games and bouldering",
+                "limit": 5,
+            },
+        },
     }
 
 
@@ -86,7 +107,7 @@ if __name__ == "__main__":
     import uvicorn
     
     uvicorn.run(
-        "main:app",
+        "backend.main:app",
         host="0.0.0.0",
         port=8000,
         reload=True,

@@ -6,8 +6,9 @@ Wraps the semantic search engine to provide AI-powered recommendations.
 import logging
 from pathlib import Path
 from typing import List, Optional
-from models import Community, CommunityMatch
-from .recommender import CommunityIndex, load_index, search_communities
+
+from backend.models import Community, CommunityMatch
+from .recommender import CommunityIndex
 
 log = logging.getLogger("recommender_service")
 

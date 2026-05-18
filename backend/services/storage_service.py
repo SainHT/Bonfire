@@ -8,7 +8,8 @@ import os
 from typing import List, Optional
 from threading import Lock
 from pathlib import Path
-from models import Community
+
+from backend.models import Community
 
 
 # Thread lock for safe concurrent access to JSON files

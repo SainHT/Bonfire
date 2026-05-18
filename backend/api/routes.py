@@ -4,24 +4,46 @@ Handles endpoints for community recommendations and data management.
 Uses semantic search via the integrated recommender engine.
 """
 
-from fastapi import APIRouter, HTTPException, Query
 from datetime import datetime
-import sys
-from pathlib import Path
 
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+from fastapi import APIRouter, HTTPException, Query
 
-from models import RecommendationRequest, RecommendationResponse, CommunityMatch
-from services import storage_service, recommender_service
+from backend.models import RecommendationRequest, RecommendationResponse
+from backend.services import storage_service, recommender_service
 
 router = APIRouter()
 
 
 @router.get("/health")
 async def health_check():
-    """Health check endpoint."""
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+    """Health check endpoint, including recommender readiness."""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "recommender": {
+            "ready": recommender_service.is_recommender_ready(),
+            "mode": "semantic" if recommender_service.is_recommender_ready() else "fallback_keyword",
+        },
+    }
+
+
+@router.get("/recommender/status")
+async def recommender_status():
+    """
+    Detailed status for the AI recommender engine.
+    Useful for verifying whether semantic search is live or the basic fallback is in use.
+    """
+    ready = recommender_service.is_recommender_ready()
+    return {
+        "ready": ready,
+        "mode": "semantic" if ready else "fallback_keyword",
+        "endpoint": "POST /api/recommend",
+        "example_payload": {
+            "city": "Delft",
+            "interests": "board games and bouldering",
+            "limit": 5,
+        },
+    }
 
 
 @router.post("/recommend", response_model=RecommendationResponse)
@@ -169,7 +191,7 @@ async def create_community(community_data: dict):
     """
     
     try:
-        from models import Community
+        from backend.models import Community
         community = Community(**community_data)
         storage_service.add_community(community)
         return {

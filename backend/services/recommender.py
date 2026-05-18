@@ -38,9 +38,6 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Union
 
 import numpy as np
-from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
-
 import torch
 
 
@@ -68,7 +65,14 @@ log = logging.getLogger("recommender")
 def _resolve_device(preferred: Optional[str] = None) -> str:
     """Pick the best torch device available, preferring MPS on Apple Silicon."""
     if preferred:
-        return preferred
+        preferred = preferred.strip().lower()
+        if preferred == "cpu":
+            return "cpu"
+        if preferred == "cuda" and torch.cuda.is_available():
+            return "cuda"
+        if preferred == "mps" and torch.backends.mps.is_available() and torch.backends.mps.is_built():
+            return "mps"
+        log.warning("Requested device '%s' is unavailable; falling back to auto-detection.", preferred)
     if torch.backends.mps.is_available() and torch.backends.mps.is_built():
         return "mps"
     if torch.cuda.is_available():
@@ -150,7 +154,7 @@ class CommunityIndex:
 
     def __init__(self, device: Optional[str] = None) -> None:
         self.device: str = _resolve_device(device)
-        self.model: Optional[SentenceTransformer] = None
+        self.model: Optional[Any] = None
         self.ids: List[Any] = []
         self.communities: List[Dict[str, Any]] = []
         self.embeddings: Optional[np.ndarray] = None
@@ -244,9 +248,8 @@ class CommunityIndex:
             device=self.device,
         ).astype(np.float32, copy=False)
 
-        # Embeddings are already L2-normalised, so cosine == dot product.
-        # We still use sklearn for the explicit "cosine similarity" requirement.
-        sims = cosine_similarity(query_vec, self.embeddings)[0]
+        # Embeddings are already L2-normalised, so cosine similarity is the dot product.
+        sims = (query_vec @ self.embeddings.T)[0]
 
         n = min(top_n, sims.shape[0])
         # argpartition for O(N) top-K, then sort just that slice.
@@ -270,7 +273,7 @@ class CommunityIndex:
             device=self.device,
         ).astype(np.float32, copy=False)
 
-        sims = cosine_similarity(query_vec, self.embeddings)[0]
+        sims = (query_vec @ self.embeddings.T)[0]
         n = min(top_n, sims.shape[0])
         partition = np.argpartition(-sims, n - 1)[:n]
         ordered = partition[np.argsort(-sims[partition])]
@@ -288,7 +291,23 @@ class CommunityIndex:
     def _ensure_model_loaded(self) -> None:
         if self.model is None:
             log.info("Loading SentenceTransformer model: %s (device=%s)", MODEL_NAME, self.device)
-            self.model = SentenceTransformer(MODEL_NAME, device=self.device)
+            try:
+                from sentence_transformers import SentenceTransformer
+
+                self.model = SentenceTransformer(MODEL_NAME, device=self.device)
+            except Exception as exc:
+                if self.device != "cpu":
+                    log.warning(
+                        "Failed to load model on device=%s (%s); retrying on cpu.",
+                        self.device,
+                        exc,
+                    )
+                    self.device = "cpu"
+                    from sentence_transformers import SentenceTransformer
+
+                    self.model = SentenceTransformer(MODEL_NAME, device=self.device)
+                else:
+                    raise
 
     @staticmethod
     def _cache_path(source: Path) -> Path:
@@ -329,7 +348,7 @@ class CommunityIndex:
         )
         try:
             with cache_path.open("wb") as fh:
-                pickle.dump(payload, fh, protocol=pickle.HIGHEST_PROTOCOL)
+                pickle.dump(payload, fh, protocol=pickle.HIGHEST_PROTOCOL)  # type: ignore[arg-type]
             log.info("Saved embedding cache to %s (%.1f KB).", cache_path.name, cache_path.stat().st_size / 1024)
         except Exception as exc:
             log.warning("Could not write embedding cache: %s", exc)
@@ -384,10 +403,8 @@ def _format_scores(rows: Iterable[Dict[str, Any]]) -> str:
 
 def _demo() -> None:
     """Tiny demo invoked when running this file directly."""
-    db_path = os.environ.get(
-        "COMMUNITIES_DB",
-        "/Users/samuelbogner/delft-scraper/delft_communities.json",
-    )
+    default_db_path = Path(__file__).resolve().parents[1] / "data" / "delft_communities.json"
+    db_path = os.environ.get("COMMUNITIES_DB", str(default_db_path))
 
     log.info("Loading semantic index from %s ...", db_path)
     index = load_index(db_path)
