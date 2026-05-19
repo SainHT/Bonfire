@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -9,6 +9,7 @@ import {
   RotateCcw,
   Send,
   Sparkles,
+  Info,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "@/components/ui/sheet";
@@ -196,12 +197,18 @@ function Home() {
                 For students &amp; newcomers
               </p>
             </div>
-          </div>
-          <div className="flex items-center gap-5">
-            <ThemeToggle />
-          </div>
-        </div>
-      </header>
+           </div>
+           <div className="flex items-center gap-5">
+             <Link
+               to="/about"
+               className="inline-flex items-center gap-1.5 text-sm text-foreground/70 hover:text-primary transition-colors"
+             >
+               <span>About</span>
+             </Link>
+             <ThemeToggle />
+           </div>
+         </div>
+       </header>
 
       <section className="max-w-[1400px] mx-auto px-5 pt-8 pb-4">
         <motion.div
@@ -289,9 +296,6 @@ function Home() {
                 {s}
               </button>
             ))}
-            <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-              · Scout searches in <span className="text-primary">{scoutCity}</span>
-            </span>
           </div>
 
           {cityNotice && (
