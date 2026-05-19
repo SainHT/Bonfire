@@ -2,7 +2,7 @@
 Delft Communities — Semantic Recommendation Engine
 ==================================================
 
-Lightweight, in-process semantic search over the ``delft_communities.json``
+Lightweight, in-process semantic search over the ``communities.json``
 file. Designed to run optimally on an Apple Silicon (M2) Mac via Metal
 Performance Shaders (MPS), with embedding caching for near-instant repeat
 queries.
@@ -38,7 +38,10 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Union
 
 import numpy as np
-import torch
+try:
+    import torch
+except Exception:  # pragma: no cover - handled by runtime fallback
+    torch = None  # type: ignore[assignment]
 
 
 # ---------------------------------------------------------------------------
@@ -64,16 +67,23 @@ log = logging.getLogger("recommender")
 
 def _resolve_device(preferred: Optional[str] = None) -> str:
     """Pick the best torch device available, preferring MPS on Apple Silicon."""
+    if torch is None:
+        log.warning("PyTorch is not installed; using CPU mode for fallback operation.")
+        return "cpu"
+
+    mps_backend = getattr(torch.backends, "mps", None)
+    mps_available = bool(mps_backend and mps_backend.is_available() and mps_backend.is_built())
+
     if preferred:
         preferred = preferred.strip().lower()
         if preferred == "cpu":
             return "cpu"
         if preferred == "cuda" and torch.cuda.is_available():
             return "cuda"
-        if preferred == "mps" and torch.backends.mps.is_available() and torch.backends.mps.is_built():
+        if preferred == "mps" and mps_available:
             return "mps"
         log.warning("Requested device '%s' is unavailable; falling back to auto-detection.", preferred)
-    if torch.backends.mps.is_available() and torch.backends.mps.is_built():
+    if mps_available:
         return "mps"
     if torch.cuda.is_available():
         return "cuda"
@@ -303,11 +313,20 @@ class CommunityIndex:
                         exc,
                     )
                     self.device = "cpu"
-                    from sentence_transformers import SentenceTransformer
+                    try:
+                        from sentence_transformers import SentenceTransformer
 
-                    self.model = SentenceTransformer(MODEL_NAME, device=self.device)
+                        self.model = SentenceTransformer(MODEL_NAME, device=self.device)
+                    except Exception as cpu_exc:
+                        raise RuntimeError(
+                            "Semantic recommender dependencies are unavailable. "
+                            "Install backend requirements (including sentence-transformers and torch)."
+                        ) from cpu_exc
                 else:
-                    raise
+                    raise RuntimeError(
+                        "Semantic recommender dependencies are unavailable. "
+                        "Install backend requirements (including sentence-transformers and torch)."
+                    ) from exc
 
     @staticmethod
     def _cache_path(source: Path) -> Path:
@@ -377,8 +396,8 @@ def search_communities(query: str, top_n: int = DEFAULT_TOP_N) -> List[Any]:
     """Return the IDs of the top-N communities most relevant to ``query``.
 
     The index returned by :func:`load_index` is used implicitly. IDs are
-    returned in their original type as stored in the JSON (integers in the
-    current ``delft_communities.json`` schema).
+    returned in their original type as stored in the JSON (strings in the
+    current ``communities.json`` schema).
     """
     if _active_index is None:
         raise RuntimeError(
@@ -403,8 +422,8 @@ def _format_scores(rows: Iterable[Dict[str, Any]]) -> str:
 
 def _demo() -> None:
     """Tiny demo invoked when running this file directly."""
-    default_db_path = Path(__file__).resolve().parents[1] / "data" / "delft_communities.json"
-    db_path = os.environ.get("COMMUNITIES_DB", str(default_db_path))
+    default_db_path = Path(__file__).resolve().parents[1] / "data" / "communities.json"
+    db_path = os.environ.get("BONFIRE_COMMUNITIES_PATH", str(default_db_path))
 
     log.info("Loading semantic index from %s ...", db_path)
     index = load_index(db_path)

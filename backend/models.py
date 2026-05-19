@@ -63,7 +63,7 @@ class RecommendationRequest(BaseModel):
     """Request body for the /recommend endpoint."""
     city: str = Field(..., description="City: Delft, Den Haag, or Rotterdam")
     interests: str = Field(..., description="Free-form user interests (e.g., 'board games and bouldering')")
-    limit: int = Field(default=5, ge=1, le=20, description="Max number of recommendations to return")
+    limit: int = Field(default=5, ge=1, le=100, description="Max number of recommendations to return")
 
 
 class RecommendationResponse(BaseModel):

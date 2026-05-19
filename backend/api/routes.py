@@ -17,13 +17,11 @@ router = APIRouter()
 @router.get("/health")
 async def health_check():
     """Health check endpoint, including recommender readiness."""
+    recommender_status = recommender_service.get_recommender_status()
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
-        "recommender": {
-            "ready": recommender_service.is_recommender_ready(),
-            "mode": "semantic" if recommender_service.is_recommender_ready() else "fallback_keyword",
-        },
+        "recommender": recommender_status,
     }
 
 
@@ -33,10 +31,9 @@ async def recommender_status():
     Detailed status for the AI recommender engine.
     Useful for verifying whether semantic search is live or the basic fallback is in use.
     """
-    ready = recommender_service.is_recommender_ready()
+    status = recommender_service.get_recommender_status()
     return {
-        "ready": ready,
-        "mode": "semantic" if ready else "fallback_keyword",
+        **status,
         "endpoint": "POST /api/recommend",
         "example_payload": {
             "city": "Delft",

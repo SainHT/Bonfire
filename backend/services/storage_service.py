@@ -17,14 +17,18 @@ json_lock = Lock()
 
 
 def get_communities_path() -> str:
-    """Get the absolute path to the communities.json file."""
+    """
+    Get the absolute path to the communities JSON file.
+
+    Honours the ``BONFIRE_COMMUNITIES_PATH`` environment variable when set,
+    so the backend can be pointed at any compatible dataset. Defaults to
+    ``backend/data/communities.json``.
+    """
+    override = os.environ.get("BONFIRE_COMMUNITIES_PATH")
+    if override:
+        return override
     current_dir = Path(__file__).parent.parent
-    # Use the cleaned Delft communities file as primary source
-    communities_file = os.path.join(current_dir, "data", "delft_communities_clean.json")
-    # Fallback to mock communities if primary doesn't exist
-    if not os.path.exists(communities_file):
-        communities_file = os.path.join(current_dir, "data", "communities.json")
-    return communities_file
+    return os.path.join(current_dir, "data", "communities.json")
 
 
 def load_communities() -> List[Community]:

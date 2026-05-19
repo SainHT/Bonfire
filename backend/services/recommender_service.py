@@ -4,45 +4,91 @@ Wraps the semantic search engine to provide AI-powered recommendations.
 """
 
 import logging
+import os
+from importlib.util import find_spec
 from pathlib import Path
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 from backend.models import Community, CommunityMatch
-from .recommender import CommunityIndex
+
+if TYPE_CHECKING:
+    from .recommender import CommunityIndex
 
 log = logging.getLogger("recommender_service")
 
 # Global index instance
-_index: Optional[CommunityIndex] = None
+_index: Optional["CommunityIndex"] = None
+_last_init_error: Optional[str] = None
+
+
+def _missing_semantic_dependencies() -> List[str]:
+    missing = []
+    for dependency in ("torch", "sentence_transformers"):
+        if find_spec(dependency) is None:
+            missing.append(dependency)
+    return missing
 
 
 def initialize_recommender(communities_file: Optional[str] = None, device: Optional[str] = None) -> None:
     """
     Initialize the semantic recommender with a communities JSON file.
-    
+
+    Resolution order for the source file:
+      1. Explicit ``communities_file`` argument.
+      2. ``BONFIRE_COMMUNITIES_PATH`` environment variable.
+      3. ``backend/data/communities.json`` (default).
+
     Args:
-        communities_file: Path to the communities JSON file. If None, uses delft_communities_clean.json
+        communities_file: Optional path to a communities JSON file.
         device: torch device to use (cpu, cuda, mps). Auto-detected if None.
     """
-    global _index
-    
+    global _index, _last_init_error
+
     if communities_file is None:
-        # Try to find delft_communities_clean.json
-        current_dir = Path(__file__).parent.parent
-        communities_file = str(current_dir / "data" / "delft_communities_clean.json")
+        env_path = os.environ.get("BONFIRE_COMMUNITIES_PATH")
+        if env_path:
+            communities_file = env_path
+        else:
+            current_dir = Path(__file__).parent.parent
+            communities_file = str(current_dir / "data" / "communities.json")
     
+    missing_dependencies = _missing_semantic_dependencies()
+    if missing_dependencies:
+        _last_init_error = (
+            "Missing semantic dependencies: "
+            + ", ".join(missing_dependencies)
+            + ". Install backend/requirements.txt to enable semantic mode."
+        )
+        log.warning(_last_init_error)
+        _index = None
+        return
+
     try:
+        from .recommender import CommunityIndex
+
         log.info(f"Initializing semantic recommender with: {communities_file}")
         _index = CommunityIndex(device=device).load(communities_file)
         log.info(f"Recommender initialized successfully. Index size: {len(_index.communities)}")
+        _last_init_error = None
     except Exception as e:
         log.error(f"Failed to initialize recommender: {e}")
+        _last_init_error = str(e)
         _index = None
 
 
 def is_recommender_ready() -> bool:
     """Check if the recommender index is loaded and ready."""
     return _index is not None and _index.embeddings is not None and len(_index.embeddings) > 0
+
+
+def get_recommender_status() -> dict:
+    """Return structured runtime status for diagnostics and API responses."""
+    ready = is_recommender_ready()
+    return {
+        "ready": ready,
+        "mode": "semantic" if ready else "fallback_keyword",
+        "error": None if ready else _last_init_error,
+    }
 
 
 def get_recommendations(
