@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -9,7 +9,6 @@ import {
   RotateCcw,
   Send,
   Sparkles,
-  Info,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "@/components/ui/sheet";
@@ -197,18 +196,12 @@ function Home() {
                 For students &amp; newcomers
               </p>
             </div>
-           </div>
-           <div className="flex items-center gap-5">
-             <Link
-               to="/about"
-               className="inline-flex items-center gap-1.5 text-sm text-foreground/70 hover:text-primary transition-colors"
-             >
-               <span>About</span>
-             </Link>
-             <ThemeToggle />
-           </div>
-         </div>
-       </header>
+          </div>
+          <div className="flex items-center gap-5">
+            <ThemeToggle />
+          </div>
+        </div>
+      </header>
 
       <section className="max-w-[1400px] mx-auto px-5 pt-8 pb-4">
         <motion.div
@@ -326,7 +319,7 @@ function Home() {
 
       <main className="max-w-[1400px] mx-auto px-5 pb-16 grid lg:grid-cols-[300px_minmax(0,1fr)] gap-6">
         <div className="hidden lg:block">
-          <div className="sticky top-6 space-y-4">
+          <div className="sticky top-6 max-h-[calc(100vh-3rem)] overflow-y-auto space-y-4 pr-1 [scrollbar-gutter:stable]">
             <SidebarFilters
               filters={filters}
               onChange={setFilters}
