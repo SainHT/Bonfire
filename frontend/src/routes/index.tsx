@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -198,6 +198,12 @@ function Home() {
             </div>
           </div>
           <div className="flex items-center gap-5">
+            <Link
+               to="/about"
+               className="inline-flex items-center gap-1.5 text-sm text-foreground/70 hover:text-primary transition-colors"
+             >
+               <span>About</span>
+            </Link>
             <ThemeToggle />
           </div>
         </div>
