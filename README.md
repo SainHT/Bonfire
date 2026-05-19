@@ -1,21 +1,9 @@
----
-title: Bonfire Backend
-emoji: 🔥
-colorFrom: orange
-colorTo: red
-sdk: docker
-app_port: 7860
-pinned: false
-short_description: Community discovery API with semantic recommendation
----
-
 # Bonfire
 
 > A hand-kept directory of student associations, sports clubs and creative
 > circles — combating urban loneliness through interest-based community
 > discovery. Starting in Delft, Den Haag and Rotterdam.
 >
-> *The YAML block above is Hugging Face Spaces metadata. GitHub ignores it.*
 
 Bonfire pairs a FastAPI backend that runs a local semantic-search recommender
 (MiniLM via `sentence-transformers`, with on-disk embedding cache) with a
