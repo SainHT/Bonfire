@@ -3,6 +3,7 @@ Main FastAPI application for Bonfire backend.
 Entry point for the community discovery and recommendation engine.
 """
 
+import os
 import sys
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -16,6 +17,17 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.api.routes import router as api_router
 from backend.services import recommender_service
+
+
+def _parse_cors_origins(raw: str | None) -> list[str]:
+    """Comma-separated origin list. '*' (default) means allow everyone."""
+    if not raw:
+        return ["*"]
+    parts = [p.strip() for p in raw.split(",") if p.strip()]
+    return parts or ["*"]
+
+
+_CORS_ORIGINS = _parse_cors_origins(os.environ.get("BONFIRE_CORS_ORIGINS"))
 
 
 @asynccontextmanager
@@ -59,11 +71,14 @@ app = FastAPI(
 )
 
 
-# Configure CORS for development (adjust for production)
+# CORS: wildcard for dev, explicit allow-list for production via
+# BONFIRE_CORS_ORIGINS (comma-separated). Credentials must be off when using
+# a wildcard, otherwise the browser rejects the response.
+_allow_credentials = _CORS_ORIGINS != ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify exact origins
-    allow_credentials=True,
+    allow_origins=_CORS_ORIGINS,
+    allow_credentials=_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )

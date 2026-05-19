@@ -1,8 +1,21 @@
+---
+title: Bonfire Backend
+emoji: 🔥
+colorFrom: orange
+colorTo: red
+sdk: docker
+app_port: 7860
+pinned: false
+short_description: Community discovery API with semantic recommendation
+---
+
 # Bonfire
 
 > A hand-kept directory of student associations, sports clubs and creative
 > circles — combating urban loneliness through interest-based community
 > discovery. Starting in Delft, Den Haag and Rotterdam.
+>
+> *The YAML block above is Hugging Face Spaces metadata. GitHub ignores it.*
 
 Bonfire pairs a FastAPI backend that runs a local semantic-search recommender
 (MiniLM via `sentence-transformers`, with on-disk embedding cache) with a
@@ -215,7 +228,88 @@ Bonfire/
 | Variable                     | Side     | Purpose                                                |
 | ---------------------------- | -------- | ------------------------------------------------------ |
 | `BONFIRE_COMMUNITIES_PATH`   | backend  | Override the JSON dataset path (default `backend/data/communities.json`) |
+| `BONFIRE_CORS_ORIGINS`       | backend  | Comma-separated allow-list (default `*`). Set this in production. |
+| `PORT`                       | backend  | Listen port inside the container (default `7860`)      |
 | `VITE_API_BASE`              | frontend | Override backend URL (default `http://localhost:8000`) |
+
+---
+
+## Deployment
+
+### Backend → Hugging Face Spaces (Docker SDK)
+
+The repo root has a `Dockerfile`, a `.dockerignore`, and YAML frontmatter at
+the top of this README — together they make the repository a valid Hugging
+Face Space.
+
+1. Create a new Space at <https://huggingface.co/new-space> with
+   **SDK = Docker** and **App port = 7860**. (The README frontmatter encodes
+   the same settings, so they'll auto-fill if you push first.)
+2. Add the Space as a git remote and push:
+
+   ```bash
+   git remote add hf https://huggingface.co/spaces/<user>/<space-name>
+   git push hf main
+   ```
+
+3. In the Space → *Settings → Variables and secrets*, set:
+
+   - `BONFIRE_CORS_ORIGINS` = `https://your-frontend.pages.dev` (whatever
+     domain your CF Pages site lives on; comma-separate multiple).
+   - *(optional)* `BONFIRE_COMMUNITIES_PATH` if you want to swap in a
+     different dataset.
+
+The first build takes 3–5 minutes (Torch + MiniLM weights are baked into the
+image so cold starts are fast). Subsequent boots take ~5 s for the
+embedding-cache rebuild against `communities.json`.
+
+The Space URL becomes your `VITE_API_BASE`, typically
+`https://<user>-<space-name>.hf.space`.
+
+#### Local sanity check before pushing
+
+```bash
+docker build -t bonfire-backend .
+docker run --rm -p 7860:7860 \
+  -e BONFIRE_CORS_ORIGINS="http://localhost:5173" \
+  bonfire-backend
+curl http://127.0.0.1:7860/api/recommender/status
+```
+
+### Frontend → Cloudflare Pages / Workers
+
+The frontend is a TanStack Start SSR app built around `@cloudflare/vite-plugin`,
+so it deploys as a Cloudflare Worker (via Workers, or "Workers for Pages").
+
+**Option A — `wrangler deploy` from your machine (recommended)**
+
+```bash
+cd frontend
+npm install -g wrangler          # or: bun add -g wrangler
+wrangler login
+
+# Build-time variable: bake the backend URL into the bundle
+VITE_API_BASE="https://<user>-<space-name>.hf.space" npm run deploy
+```
+
+`npm run deploy` is wired to `vite build && wrangler deploy`. Wrangler reads
+`frontend/wrangler.jsonc` (the existing config).
+
+**Option B — Cloudflare Pages via Git connect**
+
+1. <https://dash.cloudflare.com/> → *Pages* → *Connect to Git* → select this
+   repo.
+2. Configure the build:
+   - **Root directory**: `frontend`
+   - **Build command**: `npm run build`
+   - **Build output**: `dist` (or whatever the build prints — TanStack Start
+     usually emits `./dist`)
+3. *Settings → Environment variables → Production*:
+   - `VITE_API_BASE` = `https://<user>-<space-name>.hf.space`
+4. Trigger a deploy.
+
+After the frontend is live, copy its URL back into the Space's
+`BONFIRE_CORS_ORIGINS` variable so browser CORS works.
 
 ---
 

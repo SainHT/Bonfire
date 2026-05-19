@@ -1,0 +1,30 @@
+# Don't ship anything we don't need into the backend container.
+
+# VCS / IDE / OS noise
+.git
+.gitignore
+.idea
+.vscode
+.DS_Store
+
+# Python
+.venv
+**/__pycache__
+**/*.pyc
+**/*.pyo
+
+# Embedding cache — built at runtime from communities.json
+backend/data/*.embcache.pkl
+
+# Frontend lives in its own deployment; don't bloat the backend image
+frontend
+node_modules
+
+# Local agent / scratch artefacts
+terminals
+.cursor
+*.log
+
+# Docs and planning files
+*.md
+!Dockerfile
