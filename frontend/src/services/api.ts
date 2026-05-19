@@ -6,7 +6,7 @@ import type {
 import { VALID_RECOMMENDER_CITIES } from "@/types";
 
 const API_BASE =
-  (import.meta.env.VITE_API_BASE as string | undefined) ??
+  (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, "") ??
   "http://localhost:8000";
 
 export interface RecommendRequest {
